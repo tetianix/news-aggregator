@@ -1,0 +1,19 @@
+sources:
+  - name: DOU
+    type: rss
+    url: https://dou.ua/feed/
+
+rules:
+  - name: python-ai
+    match: "(keyword:python OR keyword:ШІ) AND NOT keyword:політика"
+
+digest:
+  period: day
+  group_by: source
+
+delivery:
+  telegram:
+    chat_id: ""
+
+update:
+  interval_minutes: 60
