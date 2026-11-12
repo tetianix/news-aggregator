@@ -198,6 +198,8 @@ Adapter і Observer вже є в коді, Composite і Decorator будуть �
 
 Мінімальний сценарій: одна RSS-стрічка → картки `Article` → C++ перевіряє ключове слово → дайджест → консоль і Telegram.
 
+<img src="docs/screenshots/telegram-digest.png" width="300" alt="Дайджест у Telegram">
+
 ## Далі
 
 - Atom і JSON Feed
