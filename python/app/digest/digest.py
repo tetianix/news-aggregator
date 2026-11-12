@@ -27,5 +27,6 @@ class DigestBuilder:
 
     def build(self, articles: List[Article], keyword: str) -> Digest:
         now = datetime.now()
-        title = f"Дайджест «{keyword}» за {now:%d.%m.%Y}, новин: {len(articles)}"
+        topic = f" «{keyword}»" if keyword else ""
+        title = f"Дайджест{topic} за {now:%d.%m.%Y}, новин: {len(articles)}"
         return Digest(title=title, articles=articles[: self._max_articles], created=now)
