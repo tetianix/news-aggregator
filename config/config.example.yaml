@@ -2,6 +2,15 @@ sources:
   - name: DOU
     type: rss
     url: https://dou.ua/feed/
+  - name: AIN.UA
+    type: rss
+    url: https://ain.ua/feed/
+  - name: CPython releases
+    type: atom
+    url: https://github.com/python/cpython/releases.atom
+  - name: JSON Feed
+    type: json
+    url: https://www.jsonfeed.org/feed.json
 
 rules:
   - name: python-ai

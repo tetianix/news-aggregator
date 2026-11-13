@@ -127,3 +127,30 @@ classDiagram
     CachedSource o-- FeedSource
     CachedSource --> ArticleCache
 ```
+
+## Factory Method (породжувальний, план)
+
+Джерела описані в конфігу полем `type`. `SourceFactory` за ним створює потрібний клас, тому код, який завантажує новини, працює тільки з `FeedSource` і не знає про конкретні формати. Новий формат додається новим класом і одним рядком у фабриці.
+
+```mermaid
+classDiagram
+    class SourceFactory {
+        <<план>>
+        +create(config) FeedSource
+    }
+    class FeedSource {
+        <<abstract>>
+        +fetch() list~Article~
+    }
+    class RssSource
+    class AtomSource {
+        <<план>>
+    }
+    class JsonFeedSource {
+        <<план>>
+    }
+    SourceFactory ..> FeedSource : створює
+    FeedSource <|-- RssSource
+    FeedSource <|-- AtomSource
+    FeedSource <|-- JsonFeedSource
+```
