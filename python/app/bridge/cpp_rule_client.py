@@ -13,8 +13,8 @@ class CppRuleClient:
         payload = {
             "keyword": keyword.lower(),
             "articles": [
-                {"id": article.id, "text": f"{article.title} {article.text}".lower()}
-                for article in articles
+                {"id": str(index), "text": f"{article.title} {article.text}".lower()}
+                for index, article in enumerate(articles)
             ],
         }
         request = urllib.request.Request(
@@ -26,4 +26,4 @@ class CppRuleClient:
         with urllib.request.urlopen(request, timeout=10) as response:
             result = json.loads(response.read())
         matched = set(result["matched"])
-        return [article for article in articles if article.id in matched]
+        return [article for index, article in enumerate(articles) if str(index) in matched]
