@@ -10,24 +10,29 @@ classDiagram
         <<abstract>>
         +fetch() list~Article~
     }
-    class RssSource {
+    class HttpFeedSource {
+        <<abstract>>
         -_url
         -_name
         +fetch() list~Article~
         -_download() bytes
-        -_parse(data) list~Article~
+        #_parse(data) list~Article~
+    }
+    class RssSource {
+        #_parse(data) list~Article~
     }
     class AtomSource {
-        <<план>>
+        #_parse(data) list~Article~
     }
     class JsonFeedSource {
-        <<план>>
+        #_parse(data) list~Article~
     }
     class Article
-    FeedSource <|-- RssSource
-    FeedSource <|-- AtomSource
-    FeedSource <|-- JsonFeedSource
-    RssSource ..> Article : створює
+    FeedSource <|-- HttpFeedSource
+    HttpFeedSource <|-- RssSource
+    HttpFeedSource <|-- AtomSource
+    HttpFeedSource <|-- JsonFeedSource
+    HttpFeedSource ..> Article : створює
 ```
 
 ## Observer (поведінковий)
@@ -128,14 +133,13 @@ classDiagram
     CachedSource --> ArticleCache
 ```
 
-## Factory Method (породжувальний, план)
+## Factory Method (породжувальний)
 
 Джерела описані в конфігу полем `type`. `SourceFactory` за ним створює потрібний клас, тому код, який завантажує новини, працює тільки з `FeedSource` і не знає про конкретні формати. Новий формат додається новим класом і одним рядком у фабриці.
 
 ```mermaid
 classDiagram
     class SourceFactory {
-        <<план>>
         +create(config) FeedSource
     }
     class FeedSource {
@@ -143,12 +147,8 @@ classDiagram
         +fetch() list~Article~
     }
     class RssSource
-    class AtomSource {
-        <<план>>
-    }
-    class JsonFeedSource {
-        <<план>>
-    }
+    class AtomSource
+    class JsonFeedSource
     SourceFactory ..> FeedSource : створює
     FeedSource <|-- RssSource
     FeedSource <|-- AtomSource
