@@ -9,14 +9,14 @@
 
 ## Основний сценарій
 
-1. Програма бере RSS-стрічку з сайту, наприклад з DOU.
+1. Програма бере стрічки з кількох сайтів (RSS, Atom, JSON Feed), список задається в `config/config.yaml`.
 2. Кожну новину перетворює в картку `Article`: назва, посилання, автор, дата, текст.
 3. Кожна новина перевіряється правилом, наприклад чи є в ній слово «python». Перевірка на C++.
 4. Новини, що підійшли, збираються в одну добірку (дайджест).
 5. Дайджест надсилається в Telegram.
 
-Спочатку роблю це для однієї стрічки і одного правила, потім додаю інші формати,
-складні правила, дублікати і кеш.
+Спочатку це працювало для однієї стрічки і одного правила. Зараз уже є кілька джерел і всі три формати,
+далі складні правила, дублікати і кеш.
 
 ## Функції
 
@@ -72,7 +72,8 @@ Inoreader шукає дублікати по посиланню або по за
 
 ```
 Python                                   C++
-RssSource -> Article -> CppRuleClient --POST /filter--> RuleEngine + KeywordRule
+config.yaml -> SourceFactory -> RssSource / AtomSource / JsonFeedSource
+SourceLoader (паралельно) -> Article -> CppRuleClient --POST /filter--> RuleEngine + KeywordRule
                               <-------- {"matched": [...]}
 DigestBuilder -> Digest -> DigestPublisher -> ConsoleChannel, TelegramChannel
 ```
@@ -96,29 +97,35 @@ classDiagram
     }
     class FeedSource {
         <<abstract>>
+        +name
         +fetch() list~Article~
     }
+    class HttpFeedSource {
+        <<abstract>>
+        +fetch() list~Article~
+        #_parse(data) list~Article~
+    }
     class RssSource
-    class AtomSource {
-        <<план>>
-    }
-    class JsonFeedSource {
-        <<план>>
-    }
+    class AtomSource
+    class JsonFeedSource
     class CachedSource {
         <<план>>
     }
-    FeedSource <|-- RssSource
-    FeedSource <|-- AtomSource
-    FeedSource <|-- JsonFeedSource
+    FeedSource <|-- HttpFeedSource
+    HttpFeedSource <|-- RssSource
+    HttpFeedSource <|-- AtomSource
+    HttpFeedSource <|-- JsonFeedSource
     FeedSource <|-- CachedSource
     CachedSource o-- FeedSource
     FeedSource ..> Article
     class SourceFactory {
-        <<план>>
         +create(config) FeedSource
     }
     SourceFactory ..> FeedSource : створює
+    class SourceLoader {
+        +load() LoadResult
+    }
+    SourceLoader o-- FeedSource
 
     class CppRuleClient {
         +filter(articles, keyword) list~Article~
@@ -182,13 +189,13 @@ classDiagram
 
 | Патерн | Група | Де | Навіщо |
 |---|---|---|---|
-| Adapter | структурний | `FeedSource`, `RssSource` | кожен формат стрічки записує новини по-своєму, а решта програми працює тільки з `Article` |
+| Adapter | структурний | `FeedSource`, `RssSource`, `AtomSource`, `JsonFeedSource` | кожен формат стрічки записує новини по-своєму, а решта програми працює тільки з `Article` |
 | Observer | поведінковий | `DigestPublisher`, `DeliveryChannel` | дайджест не знає, куди його шлють; канали підписуються і отримують його самі |
 | Composite | структурний | `Rule`, `AndRule`, `OrRule`, `NotRule` (план) | правила складаються з інших правил, і з усім деревом працюємо як з одним правилом |
 | Decorator | структурний | `CachedSource` (план) | кеш і офлайн-режим додаються поверх будь-якого джерела без його зміни |
-| Factory Method | породжувальний | `SourceFactory` (план) | джерело потрібного типу створюється з конфігу, і код, який завантажує новини, не знає про конкретні класи |
+| Factory Method | породжувальний | `SourceFactory` | джерело потрібного типу створюється з конфігу, і код, який завантажує новини, не знає про конкретні класи |
 
-Adapter і Observer вже є в коді, Composite, Decorator і Factory Method будуть наступними.
+Adapter, Observer і Factory Method вже є в коді, Composite і Decorator будуть наступними.
 Окрема діаграма для кожного патерну: [docs/patterns.md](docs/patterns.md).
 
 ## Ризики
@@ -202,13 +209,15 @@ Adapter і Observer вже є в коді, Composite, Decorator і Factory Metho
 
 ## Що зараз працює
 
-Мінімальний сценарій: одна RSS-стрічка → картки `Article` → C++ перевіряє ключове слово → дайджест → консоль і Telegram.
+Кілька джерел з конфігу (RSS, Atom, JSON Feed) завантажуються паралельно → картки `Article` → C++ перевіряє ключове слово → дайджест, згрупований за джерелами, зі статистикою → консоль і Telegram.
+
+Якщо якийсь сайт не відповідає, програма пише про це в консоль і працює з рештою джерел.
 
 <img src="docs/screenshots/telegram-digest.png" width="300" alt="Дайджест у Telegram">
 
-## Кілька джерел (план)
+## Кілька джерел
 
-Зараз флоу працює з однією стрічкою. У повній версії джерел буде багато, і це працюватиме так.
+Як це працює:
 
 **1. Список джерел у конфігу.** Не в коді, а у файлі `config/config.yaml`: назва, тип і адреса кожного джерела.
 
@@ -228,13 +237,13 @@ sources:
     url: https://www.jsonfeed.org/feed.json
 ```
 
-**2. Потрібний клас створює фабрика.** `SourceFactory` дивиться на поле `type` і створює `RssSource`, `AtomSource` або `JsonFeedSource`. Щоб додати новий формат, досить нового класу і одного рядка у фабриці (Factory Method).
+**2. Потрібний клас створює фабрика.** `SourceFactory` дивиться на поле `type` і створює `RssSource`, `AtomSource` або `JsonFeedSource`. Щоб додати новий формат, досить нового класу і одного рядка у фабриці (Factory Method). Завантаження сторінки спільне для всіх форматів і лежить у `HttpFeedSource`, кожен формат пише тільки свій `_parse`.
 
-**3. Джерела завантажуються паралельно.** Сайти качаються одночасно в кількох потоках (`ThreadPoolExecutor`), а не по черзі, тому повільний сайт не затримує інші.
+**3. Джерела завантажуються паралельно.** `SourceLoader` качає сайти одночасно в кількох потоках (`ThreadPoolExecutor`), а не по черзі, тому повільний сайт не затримує інші.
 
-**4. Одне джерело не ламає все.** Якщо сайт не відповідає, помилка пишеться в лог, а новини цього джерела беруться з кешу в SQLite. Решта джерел працює як звичайно.
+**4. Одне джерело не ламає все.** Якщо сайт не відповідає, помилка пишеться в консоль, а решта джерел працює як звичайно. Далі новини такого джерела братимуться з кешу в SQLite.
 
-**5. Усі новини йдуть в один список.** У кожної картки `Article` є поле `source`, тому завжди видно, звідки новина. Далі C++ шукає дублікати між джерелами, а в дайджесті рахується статистика по кожному джерелу.
+**5. Усі новини йдуть в один список.** У кожної картки `Article` є поле `source`, тому завжди видно, звідки новина. Дайджест групує новини за джерелами і внизу показує, скільки новин прийшло з кожного. Далі C++ шукатиме дублікати між джерелами.
 
 ```
 config.yaml -> SourceFactory -> RssSource / AtomSource / JsonFeedSource
@@ -244,19 +253,25 @@ config.yaml -> SourceFactory -> RssSource / AtomSource / JsonFeedSource
 
 ## Далі
 
-- кілька джерел одночасно (паралельне завантаження, Factory Method)
-- Atom і JSON Feed
 - правила з І / АБО / НЕ на C++ (Composite)
 - пошук дублікатів на C++
 - кеш і офлайн-режим (Decorator)
-- статистика в дайджесті
+- найчастіші ключові слова в дайджесті
 - інтерфейс у терміналі
 
 ## Запуск
 
 Потрібні Python 3.9+, CMake і компілятор C++.
 
-**1. C++-сервер**
+**1. Конфіг**
+
+```
+cp config/config.example.yaml config/config.yaml
+```
+
+У `config.yaml` можна змінити список джерел. Якщо файлу немає, береться `config.example.yaml`.
+
+**2. C++-сервер**
 
 ```
 cd cpp
@@ -265,7 +280,7 @@ cmake --build build
 ./build/rule_server
 ```
 
-**2. Python (в іншому вікні терміналу)**
+**3. Python (в іншому вікні терміналу)**
 
 ```
 cd python
@@ -279,7 +294,7 @@ python -m app.main
 
 | Змінна | Що це | За замовчуванням |
 |---|---|---|
-| `FEED_URL` | адреса RSS-стрічки | `https://dou.ua/feed/` |
+| `CONFIG` | шлях до конфігу | `config/config.yaml` |
 | `KEYWORD` | ключове слово | `python` |
 | `CPP_URL` | адреса C++-сервера | `http://127.0.0.1:8080` |
 | `TELEGRAM_BOT_TOKEN` | токен бота | не задано, тоді тільки консоль |
